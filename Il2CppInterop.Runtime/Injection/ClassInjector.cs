@@ -1112,7 +1112,7 @@ public static unsafe partial class ClassInjector
         return type;
     }
 
-    private static string GetIl2CppTypeFullName(Il2CppTypeStruct* typePointer)
+    private static string GetIl2CppTypeFullName(Il2CppTypeStruct* typePointer, bool prefix = false)
     {
         var klass = UnityVersionHandler.Wrap((Il2CppClass*)IL2CPP.il2cpp_class_from_type((IntPtr)typePointer));
         var assembly = UnityVersionHandler.Wrap(UnityVersionHandler.Wrap(klass.Image).Assembly);
@@ -1122,9 +1122,11 @@ public static unsafe partial class ClassInjector
         var namespaceName = Marshal.PtrToStringAnsi(klass.Namespace);
         if (!string.IsNullOrEmpty(namespaceName))
         {
+            if (prefix) fullName.Append("Il2Cpp");
             fullName.Append(namespaceName);
             fullName.Append('.');
         }
+        else if (prefix) fullName.Append("Il2Cpp.");
 
         var declaringType = klass;
         while ((declaringType = UnityVersionHandler.Wrap(declaringType.DeclaringType)) != default)
@@ -1139,6 +1141,7 @@ public static unsafe partial class ClassInjector
         if (assemblyName != "mscorlib")
         {
             fullName.Append(", ");
+            if (prefix) fullName.Append("Il2Cpp");
             fullName.Append(assemblyName);
         }
 
@@ -1148,7 +1151,13 @@ public static unsafe partial class ClassInjector
     internal static Type SystemTypeFromIl2CppType(Il2CppTypeStruct* typePointer)
     {
         var fullName = GetIl2CppTypeFullName(typePointer);
-        var type = Type.GetType(fullName) ?? throw new NullReferenceException($"Couldn't find System.Type for Il2Cpp type: {fullName}");
+        var type = Type.GetType(fullName);
+
+        if (type == null)
+        {
+            fullName = GetIl2CppTypeFullName(typePointer, prefix: true);
+            type = Type.GetType(fullName) ?? throw new NullReferenceException($"Couldn't find System.Type for Il2Cpp type: {fullName}");
+        }
 
         INativeTypeStruct wrappedType = UnityVersionHandler.Wrap(typePointer);
         if (wrappedType.Type == Il2CppTypeEnum.IL2CPP_TYPE_GENERICINST)
